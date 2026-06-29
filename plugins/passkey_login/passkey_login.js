@@ -399,6 +399,34 @@ function rcube_passkey_login() {
         return rcmail.get_label(name, 'passkey_login');
     }
 
+    // Remember the last authentication method used on this device so the next
+    // login can default to it (and so we can offer the matching switch link).
+    var METHOD_COOKIE = 'passkey_login_method';
+
+    function setMethod(value) {
+        try {
+            var secure = location.protocol === 'https:' ? '; Secure' : '';
+            // 30 days, in seconds.
+            document.cookie = METHOD_COOKIE + '=' + value
+                + '; Max-Age=' + (30 * 24 * 60 * 60) + '; Path=/; SameSite=Lax' + secure;
+        } catch (e) {}
+    }
+
+    function lastMethod() {
+        try {
+            var m = document.cookie.match(/(?:^|;\s*)passkey_login_method=([^;]*)/);
+            return m ? decodeURIComponent(m[1]) : null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    // Whether a passkey sign-in can be offered right now: the browser supports
+    // it, PRF isn't known-broken, and we have credentials + an unused challenge.
+    function passkeyAvailable() {
+        return !!(webauthn && prfSupported !== false && credentials.length && challenge);
+    }
+
     var pass_row = row_of(pass),
         host_row = host ? row_of(host) : null,
         buttons = (submit && submit.parentNode) || form;
@@ -419,7 +447,9 @@ function rcube_passkey_login() {
 
     var change = mklink('passkey-change', label('changeuser'));
     var usepass = mklink('passkey-usepass', label('usepassword'));
+    var usepasskey = mklink('passkey-usepasskey', label('usepasskey'));
     buttons.appendChild(usepass);
+    buttons.appendChild(usepasskey);
     buttons.appendChild(change);
 
     // Enrollment opt-in (shown on the password step when supported).
@@ -490,6 +520,7 @@ function rcube_passkey_login() {
         show(next, true);
         show(change, false);
         show(usepass, false);
+        show(usepasskey, false);
         show(enrollWrap, false);
         setStatus('');
         pass.removeAttribute('required');
@@ -508,6 +539,7 @@ function rcube_passkey_login() {
         show(signinBtn, true);
         show(change, true);
         show(usepass, true);
+        show(usepasskey, false);
         show(enrollWrap, false);
         pass.removeAttribute('required');
         user.setAttribute('readonly', 'readonly');
@@ -525,6 +557,8 @@ function rcube_passkey_login() {
         show(signinBtn, false);
         show(change, true);
         show(usepass, false);
+        // Offer switching (back) to passkey only when one can actually be used.
+        show(usepasskey, passkeyAvailable());
         // Only offer enrollment when PRF support isn't known to be missing.
         show(enrollWrap, prfSupported !== false);
         if (enrollBox) {
@@ -610,7 +644,13 @@ function rcube_passkey_login() {
                 ) {
                     credentials = data.credentials;
                     challenge = data.challenge;
-                    toPasskey();
+                    // Default to whichever method this device used last; the
+                    // password step still offers a link back to the passkey.
+                    if (lastMethod() === 'password') {
+                        toPassword();
+                    } else {
+                        toPasskey();
+                    }
                 } else {
                     toPassword();
                 }
@@ -652,6 +692,7 @@ function rcube_passkey_login() {
                 return verifyAssertion(r.verify).then(function () {
                     pass.value = r.password;
                     setStatus(label('passkeyok'));
+                    setMethod('passkey'); // remember for next time on this device
                     realSubmit();
                 });
             })
@@ -688,6 +729,8 @@ function rcube_passkey_login() {
                         alg: blob.alg,
                     }));
                 } catch (e) {}
+                // The user just opted into passkeys — prefer them next time.
+                setMethod('passkey');
                 realSubmit();
             })
             .catch(function (err) {
@@ -720,6 +763,7 @@ function rcube_passkey_login() {
     signinBtn.addEventListener('click', function (e) { e.preventDefault(); doSignin(); });
     change.addEventListener('click', function (e) { e.preventDefault(); toUsername(); });
     usepass.addEventListener('click', function (e) { e.preventDefault(); toPassword(); });
+    usepasskey.addEventListener('click', function (e) { e.preventDefault(); toPasskey(); });
 
     // Roundcube's own login-form handler (program/js/app.js) shows a
     // persistent "Loading…" message and disables the submit button on every
@@ -742,8 +786,10 @@ function rcube_passkey_login() {
             e.preventDefault();
             e.stopPropagation();
             enrollThenSubmit();
+        } else if (state === 'password') {
+            // Plain password login: record the method, then submit normally.
+            setMethod('password');
         }
-        // password step without enrollment: allow normal submit.
     }, true);
 
     toUsername();

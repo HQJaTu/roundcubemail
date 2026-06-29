@@ -14,7 +14,8 @@
 }
 
 #login-form .passkey-change,
-#login-form .passkey-usepass {
+#login-form .passkey-usepass,
+#login-form .passkey-usepasskey {
     display: block;
     margin-top: .75em;
     text-align: center;

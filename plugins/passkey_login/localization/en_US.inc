@@ -15,6 +15,7 @@
 $labels['next'] = 'Next';
 $labels['changeuser'] = 'Not you? Change';
 $labels['usepassword'] = 'Use password instead';
+$labels['usepasskey'] = 'Use a passkey instead';
 $labels['signinpasskey'] = 'Sign in with a passkey';
 $labels['enrolllabel'] = 'Set up a passkey on this device';
 $labels['checking'] = 'Checking…';
