@@ -10,7 +10,9 @@ Step 1            Step 2 (passkey enrolled)      Step 2 (no passkey)
 │ username  │ ──▶ │ [Sign in with passkey]│  or  │ password           │
 │  [Next]   │     │  Use password instead │      │ ☐ set up a passkey │
 └───────────┘     └───────────────────────┘      │ [Login]            │
-                                                  └────────────────────┘
+                       ▲              │           │ Use a passkey …    │
+                       └──────────────┘           └────────────────────┘
+                       (links switch both ways)
 ```
 
 1. The user enters a username. The browser asks the server (pre-auth) whether
@@ -22,6 +24,22 @@ Step 1            Step 2 (passkey enrolled)      Step 2 (no passkey)
 3. **If no passkey exists**, the password field is shown with an opt-in to
    *set up a passkey on this device*. On a successful password login, the typed
    password is encrypted in the browser and stored for next time.
+
+Each step links to the other: the passkey step offers *Use password instead*,
+and (when a passkey can actually be used here) the password step offers *Use a
+passkey instead*.
+
+Remembering the last method
+---------------------------
+
+On every successful sign-in the plugin records which method was used in a
+`passkey_login_method` cookie (value `passkey` or `password`, 30-day lifetime,
+`SameSite=Lax`, `Secure` over HTTPS). When the user next signs in on a device
+that has a passkey available, that cookie chooses the default step — so a user
+who prefers the password (e.g. on a browser/device where passkeys aren't
+practical) isn't pushed back to the passkey prompt every time. They can always
+switch with the per-step links, and "Not you? Change" returns to the username
+step. The cookie is a convenience hint only; it holds no secrets.
 
 How the password is protected
 ------------------------------

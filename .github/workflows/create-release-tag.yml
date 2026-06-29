@@ -1,0 +1,34 @@
+name: Create Release Tag
+
+# Manually-run workflow that creates and pushes a timestamp git tag.
+# That tag is the seed the release process needs: after this runs, start the
+# "Release Plugins" workflow to build the per-plugin zips and attach them.
+#
+# Tag format: YYYY-MM-DDTHH-MM (UTC). Note the time uses a hyphen, not a colon
+# (":" is not allowed in git ref names), e.g. 2026-06-29T14-30.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write # Required to push the tag
+
+jobs:
+  create-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Create and push timestamp tag
+        run: |
+          TAG="$(date -u +'%Y-%m-%dT%H-%M')"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git tag -a "$TAG" -m "Plugin release $TAG"
+          git push origin "refs/tags/$TAG"
+
+          echo "Created and pushed tag: $TAG"
+          echo "### Created tag \`$TAG\`" >> "$GITHUB_STEP_SUMMARY"
