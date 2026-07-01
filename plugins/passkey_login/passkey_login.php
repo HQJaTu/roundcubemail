@@ -404,9 +404,9 @@ class passkey_login extends rcube_plugin
         // wrong password — which would silently break the new key at IMAP. The
         // server already holds this password; it is compared, never persisted.
         $password = rcube_utils::get_input_string('password', rcube_utils::INPUT_POST);
-        if ($password !== null && $password !== '') {
+        if ($password !== '') {
             $session = (string) $this->rc->decrypt((string) ($_SESSION['password'] ?? ''));
-            if ($session === '' || !hash_equals($session, (string) $password)) {
+            if ($session === '' || !hash_equals($session, $password)) {
                 $this->json(['ok' => false, 'error' => 'bad_password']);
             }
         }
@@ -649,32 +649,32 @@ class passkey_login extends rcube_plugin
 
         // Order matters: Edge/Opera identify themselves *and* carry "Chrome".
         $browser = '';
-        if (strpos($ua, 'Edg') !== false) {
+        if (str_contains($ua, 'Edg')) {
             $browser = 'Edge';
-        } elseif (strpos($ua, 'OPR') !== false || strpos($ua, 'Opera') !== false) {
+        } elseif (str_contains($ua, 'OPR') || str_contains($ua, 'Opera')) {
             $browser = 'Opera';
-        } elseif (strpos($ua, 'Firefox') !== false) {
+        } elseif (str_contains($ua, 'Firefox')) {
             $browser = 'Firefox';
-        } elseif (strpos($ua, 'Chrome') !== false) {
+        } elseif (str_contains($ua, 'Chrome')) {
             $browser = 'Chrome';
-        } elseif (strpos($ua, 'Safari') !== false) {
+        } elseif (str_contains($ua, 'Safari')) {
             $browser = 'Safari';
         }
 
         $os = '';
-        if (strpos($ua, 'Windows') !== false) {
+        if (str_contains($ua, 'Windows')) {
             $os = 'Windows';
-        } elseif (strpos($ua, 'Android') !== false) { // before Linux (Android UAs contain "Linux")
+        } elseif (str_contains($ua, 'Android')) { // before Linux (Android UAs contain "Linux")
             $os = 'Android';
-        } elseif (strpos($ua, 'iPhone') !== false) {
+        } elseif (str_contains($ua, 'iPhone')) {
             $os = 'iPhone';
-        } elseif (strpos($ua, 'iPad') !== false) {
+        } elseif (str_contains($ua, 'iPad')) {
             $os = 'iPad';
-        } elseif (strpos($ua, 'Mac OS X') !== false || strpos($ua, 'Macintosh') !== false) {
+        } elseif (str_contains($ua, 'Mac OS X') || str_contains($ua, 'Macintosh')) {
             $os = 'macOS';
-        } elseif (strpos($ua, 'CrOS') !== false) {
+        } elseif (str_contains($ua, 'CrOS')) {
             $os = 'ChromeOS';
-        } elseif (strpos($ua, 'Linux') !== false) {
+        } elseif (str_contains($ua, 'Linux')) {
             $os = 'Linux';
         }
 
