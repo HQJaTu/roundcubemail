@@ -64,7 +64,8 @@ the login is allowed to proceed:
    - the **signature** verifies against the stored public key
      (`openssl_verify`, ES256/RS256), over
      `authenticatorData || SHA-256(clientDataJSON)`;
-   - the signature **counter** has increased (cloned-authenticator detection).
+   - the signature **counter** has not gone backwards (cloned-authenticator
+     detection — see the note below).
 
    The challenge is consumed on first use (replay protection). Only if all
    checks pass does the browser submit the decrypted password to the normal
@@ -73,6 +74,16 @@ the login is allowed to proceed:
 The expected RP ID and origin are derived from the request by default; override
 with `passkey_login_rpid` / `passkey_login_origin` (see `config.inc.php.dist`)
 behind a reverse proxy. Requires PHP's OpenSSL extension.
+
+> **Note on the signature counter.** WebAuthn's `signCount` is optional. Synced
+> and platform passkeys — iCloud Keychain, Google Password Manager, often
+> Windows Hello — report `0` on every assertion by design (a credential that
+> lives on several devices can't keep a single monotonic counter), so their
+> `sign_count` column stays `0` and never increments. That is expected, not a
+> bug. Dedicated hardware keys (e.g. YubiKey) do keep a real counter, which
+> climbs on each use. Clone detection therefore only rejects a genuine
+> *decrease* (`sign_count > 0` in the assertion but `<=` the stored value); an
+> incoming `0` is treated as "no counter" and never blocks sign-in.
 
 Database
 --------

@@ -353,8 +353,12 @@ class passkey_login extends rcube_plugin
         }
 
         // 4) cloned-authenticator detection via the signature counter.
+        // An incoming count of 0 means the authenticator keeps no counter
+        // (synced/platform passkeys, e.g. iCloud, always report 0) — that is
+        // never a clone signal, even if this credential was previously used on
+        // a device that did report a counter. Only a real decrease is suspect.
         $stored = (int) $row['sign_count'];
-        if (($sign_count > 0 || $stored > 0) && $sign_count <= $stored) {
+        if ($sign_count > 0 && $sign_count <= $stored) {
             $this->json(['ok' => false, 'error' => 'counter']);
         }
 
