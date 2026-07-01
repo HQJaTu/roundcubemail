@@ -89,6 +89,40 @@ sqlite3 /path/to/roundcube.db < plugins/passkey_login/SQL/sqlite.sql
 If you use a `db_prefix`, add it to the table (and Postgres sequence) names in
 the SQL file before importing.
 
+### Upgrading
+
+The passkey management UI (below) stores a per-key **description**. If you
+installed the plugin before that column existed, add it once (the same
+statement works on MySQL/MariaDB, PostgreSQL and SQLite):
+
+```sql
+ALTER TABLE passkey_login ADD COLUMN description varchar(255) NOT NULL DEFAULT '';
+```
+
+Managing passkeys
+-----------------
+
+Once signed in, users manage their enrolled passkeys under **Settings →
+Passkeys**:
+
+- **List** every enrolled key with its description and the date it was added.
+- **Rename** a key's description (saved instantly). Each key gets an
+  auto-generated default at enrollment derived from the browser/OS
+  (e.g. *"Chrome on Windows"*), so multiple keys are distinguishable out of the
+  box; users override it with something meaningful ("My YubiKey").
+- **Delete** an individual key.
+- **Add a passkey** on the current device without logging out. This re-runs the
+  enrollment ceremony in the browser; the user confirms their account password
+  (needed so the browser can encrypt it for the new key — it is verified against
+  the active session and never stored in the clear).
+
+> **Note on usernames.** The encryption key is derived from the exact login name
+> entered at sign-in (an existing property of the plugin). A passkey added from
+> Settings uses your stored account username; if your deployment rewrites the
+> typed login name (e.g. appends a domain), a Settings-added key may not decrypt
+> at the next sign-in — in that case just delete it and enroll from the login
+> page instead.
+
 Installation
 ------------
 

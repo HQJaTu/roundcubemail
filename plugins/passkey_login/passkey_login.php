@@ -47,6 +47,7 @@ class passkey_login extends rcube_plugin
     private const MAX_IV = 64;
     private const MAX_SECRET = 8192;
     private const MAX_PUBKEY = 2048;
+    private const MAX_DESC = 255;
 
     /** WebAuthn assertion challenge lifetime, in seconds. */
     private const CHALLENGE_TTL = 300;
@@ -83,6 +84,14 @@ class passkey_login extends rcube_plugin
         // (for the sign-in/enrollment UI) and onto authenticated pages (so a
         // pending enrollment created during login can be persisted).
         $this->add_hook('render_page', [$this, 'render_page']);
+
+        // Settings task: add a "Passkeys" section to list and manage the user's
+        // enrolled passkeys (rename, delete, add a new one).
+        if ($this->rc->task === 'settings') {
+            $this->add_hook('preferences_sections_list', [$this, 'prefs_sections']);
+            $this->add_hook('preferences_list', [$this, 'prefs_list']);
+            $this->add_texts('localization/');
+        }
     }
 
     /**
@@ -143,6 +152,12 @@ class passkey_login extends rcube_plugin
                 break;
             case 'plugin.passkey_remove':
                 $this->action_remove();  // exits
+                break;
+            case 'plugin.passkey_rename':
+                $this->action_rename();  // exits
+                break;
+            case 'plugin.passkey_delete':
+                $this->action_delete();  // exits
                 break;
         }
 
@@ -380,6 +395,24 @@ class passkey_login extends rcube_plugin
             $this->json(['error' => 'invalid_input']);
         }
 
+        // When the client provides a password (the Settings "add a passkey"
+        // flow), it must match the live session password. This blocks storing a
+        // wrong password — which would silently break the new key at IMAP. The
+        // server already holds this password; it is compared, never persisted.
+        $password = rcube_utils::get_input_string('password', rcube_utils::INPUT_POST);
+        if ($password !== null && $password !== '') {
+            $session = (string) $this->rc->decrypt((string) ($_SESSION['password'] ?? ''));
+            if ($session === '' || !hash_equals($session, (string) $password)) {
+                $this->json(['ok' => false, 'error' => 'bad_password']);
+            }
+        }
+
+        // Description: user-supplied label, else a browser/OS default.
+        $description = $this->clean_desc(rcube_utils::get_input_string('description', rcube_utils::INPUT_POST));
+        if ($description === '') {
+            $description = $this->describe_user_agent();
+        }
+
         $db = $this->rc->get_dbh();
         $table = $db->table_name('passkey_login', true);
 
@@ -388,9 +421,9 @@ class passkey_login extends rcube_plugin
 
         $db->query(
             "INSERT INTO {$table}"
-                . ' (`user_id`, `cred_id`, `iv`, `secret`, `public_key`, `alg`, `sign_count`, `created`)'
-                . ' VALUES (?, ?, ?, ?, ?, ?, 0, ' . $db->now() . ')',
-            $user_id, $cred_id, $iv, $secret, $public_key, $alg
+                . ' (`user_id`, `cred_id`, `iv`, `secret`, `public_key`, `alg`, `sign_count`, `description`, `created`)'
+                . ' VALUES (?, ?, ?, ?, ?, ?, 0, ?, ' . $db->now() . ')',
+            $user_id, $cred_id, $iv, $secret, $public_key, $alg, $description
         );
 
         if ($error = $db->is_error()) {
@@ -405,7 +438,69 @@ class passkey_login extends rcube_plugin
             $this->json(['ok' => false, 'error' => 'db']);
         }
 
-        $this->json(['ok' => true]);
+        // Return the row fields the Settings UI needs to render the new entry.
+        $this->json([
+            'ok' => true,
+            'credId' => $cred_id,
+            'description' => $description,
+            'created' => $this->rc->format_date(date('Y-m-d H:i:s')),
+        ]);
+    }
+
+    /**
+     * POST plugin.passkey_rename (authenticated).
+     * Update the user-visible description of one of the current user's passkeys.
+     */
+    private function action_rename()
+    {
+        $user_id = (int) $this->rc->get_user_id();
+
+        if (!$user_id || !$this->rc->check_request()) {
+            $this->json(['error' => 'unauthorized']);
+        }
+
+        $cred_id = (string) rcube_utils::get_input_string('cred_id', rcube_utils::INPUT_POST);
+        if (!$this->valid_b64($cred_id, self::MAX_CRED_ID)) {
+            $this->json(['ok' => false, 'error' => 'invalid_input']);
+        }
+
+        $description = $this->clean_desc(rcube_utils::get_input_string('description', rcube_utils::INPUT_POST));
+
+        $db = $this->rc->get_dbh();
+        $db->query(
+            'UPDATE ' . $db->table_name('passkey_login', true)
+                . ' SET `description` = ? WHERE `user_id` = ? AND `cred_id` = ?',
+            $description, $user_id, $cred_id
+        );
+
+        $this->json(['ok' => !$db->is_error(), 'description' => $description]);
+    }
+
+    /**
+     * POST plugin.passkey_delete (authenticated).
+     * Delete a single one of the current user's passkeys.
+     */
+    private function action_delete()
+    {
+        $user_id = (int) $this->rc->get_user_id();
+
+        if (!$user_id || !$this->rc->check_request()) {
+            $this->json(['error' => 'unauthorized']);
+        }
+
+        $cred_id = (string) rcube_utils::get_input_string('cred_id', rcube_utils::INPUT_POST);
+        if (!$this->valid_b64($cred_id, self::MAX_CRED_ID)) {
+            $this->json(['ok' => false, 'error' => 'invalid_input']);
+        }
+
+        $db = $this->rc->get_dbh();
+        $db->query(
+            'DELETE FROM ' . $db->table_name('passkey_login', true)
+                . ' WHERE `user_id` = ? AND `cred_id` = ?',
+            $user_id, $cred_id
+        );
+
+        $this->json(['ok' => !$db->is_error()]);
     }
 
     /**
@@ -427,6 +522,183 @@ class passkey_login extends rcube_plugin
         );
 
         $this->json(['ok' => !$db->is_error()]);
+    }
+
+    /**
+     * Settings: register the "Passkeys" section.
+     */
+    public function prefs_sections($args)
+    {
+        $args['list']['passkeys'] = [
+            'id' => 'passkeys',
+            'section' => $this->gettext('passkeys'),
+        ];
+
+        return $args;
+    }
+
+    /**
+     * Settings: render the passkey management UI (list + rename + delete + add).
+     */
+    public function prefs_list($args)
+    {
+        if ($args['section'] !== 'passkeys') {
+            return $args;
+        }
+
+        $args['blocks']['passkeys']['name'] = $this->gettext('passkeys');
+
+        // Lazy-load placeholder until the section is actually opened.
+        if (empty($args['current'])) {
+            $args['blocks']['passkeys']['content'] = true;
+
+            return $args;
+        }
+
+        $user_id = (int) $this->rc->get_user_id();
+        $passkeys = [];
+
+        if ($user_id) {
+            $db = $this->rc->get_dbh();
+            $result = $db->query(
+                'SELECT `cred_id`, `description`, `created` FROM ' . $db->table_name('passkey_login', true)
+                    . ' WHERE `user_id` = ? ORDER BY `created`',
+                $user_id
+            );
+            while ($row = $db->fetch_assoc($result)) {
+                $passkeys[] = $row;
+            }
+        }
+
+        // One editable row per passkey.
+        $rows = '';
+        foreach ($passkeys as $pk) {
+            $input = new html_inputfield(['class' => 'passkey-desc', 'maxlength' => self::MAX_DESC]);
+
+            $rows .= html::tag('tr', ['class' => 'passkey-row', 'data-cred' => $pk['cred_id']],
+                html::tag('td', ['class' => 'passkey-desc-cell'], $input->show((string) $pk['description']))
+                . html::tag('td', ['class' => 'passkey-created'], rcube::Q($this->rc->format_date($pk['created'])))
+                . html::tag('td', ['class' => 'passkey-actions'],
+                    html::a(['href' => '#', 'class' => 'passkey-delete button delete'], rcube::Q($this->gettext('passkeysdelete')))
+                )
+            );
+        }
+
+        $table = html::tag('table', ['id' => 'passkey-manage-table', 'class' => 'proplist passkey-manage-table', 'style' => $passkeys ? '' : 'display:none'],
+            html::tag('thead', null, html::tag('tr', null,
+                html::tag('td', null, rcube::Q($this->gettext('passkeysdescription')))
+                . html::tag('td', null, rcube::Q($this->gettext('passkeyscreated')))
+                . html::tag('td', null, '')
+            ))
+            . html::tag('tbody', null, $rows)
+        );
+
+        $empty = html::div(['id' => 'passkey-manage-empty', 'class' => 'hint', 'style' => $passkeys ? 'display:none' : ''],
+            rcube::Q($this->gettext('passkeysnone')));
+
+        $addbtn = html::tag('button', ['type' => 'button', 'id' => 'passkey-add', 'class' => 'button create'],
+            rcube::Q($this->gettext('passkeysadd')));
+
+        $content = html::div(['id' => 'passkey-manage'],
+            html::div(['class' => 'passkey-manage-toolbar'], $addbtn) . $empty . $table);
+
+        $args['blocks']['passkeys']['options']['list'] = ['content' => $content];
+
+        // Client assets + data. rcube_passkey.enroll() (from passkey_login.js,
+        // loaded on every authenticated page by render_page) is reused for the
+        // "add a passkey" ceremony; this script drives the management UI.
+        $this->include_stylesheet('passkey_login.css');
+        $this->include_script('passkey_settings.js');
+
+        $this->rc->output->set_env('passkey_login_manage', [
+            'rename_url' => $this->rc->url(['_action' => 'plugin.passkey_rename']),
+            'delete_url' => $this->rc->url(['_action' => 'plugin.passkey_delete']),
+            'store_url' => $this->rc->url(['_action' => 'plugin.passkey_store']),
+            'username' => $this->rc->get_user_name(),
+            'rp_name' => $this->rc->config->get('passkey_login_rp_name', 'Roundcube Webmail'),
+            'labels' => [
+                'add' => $this->gettext('passkeysadd'),
+                'delete' => $this->gettext('passkeysdelete'),
+                'deleteconfirm' => $this->gettext('passkeysdeleteconfirm'),
+                'none' => $this->gettext('passkeysnone'),
+                'saved' => $this->gettext('passkeyssaved'),
+                'savefailed' => $this->gettext('passkeyssavefailed'),
+                'addtitle' => $this->gettext('passkeysaddtitle'),
+                'password' => $this->gettext('passkeyspassword'),
+                'passwordhint' => $this->gettext('passkeyspasswordhint'),
+                'description' => $this->gettext('passkeysdescription'),
+                'addfailed' => $this->gettext('passkeysaddfailed'),
+                'badpassword' => $this->gettext('passkeysbadpassword'),
+            ],
+        ]);
+
+        return $args;
+    }
+
+    /**
+     * A sensible default passkey description derived from the enrolling
+     * browser/OS (e.g. "Chrome on Windows"), which the user can rename.
+     */
+    private function describe_user_agent()
+    {
+        $ua = (string) ($_SERVER['HTTP_USER_AGENT'] ?? '');
+
+        // Order matters: Edge/Opera identify themselves *and* carry "Chrome".
+        $browser = '';
+        if (strpos($ua, 'Edg') !== false) {
+            $browser = 'Edge';
+        } elseif (strpos($ua, 'OPR') !== false || strpos($ua, 'Opera') !== false) {
+            $browser = 'Opera';
+        } elseif (strpos($ua, 'Firefox') !== false) {
+            $browser = 'Firefox';
+        } elseif (strpos($ua, 'Chrome') !== false) {
+            $browser = 'Chrome';
+        } elseif (strpos($ua, 'Safari') !== false) {
+            $browser = 'Safari';
+        }
+
+        $os = '';
+        if (strpos($ua, 'Windows') !== false) {
+            $os = 'Windows';
+        } elseif (strpos($ua, 'Android') !== false) { // before Linux (Android UAs contain "Linux")
+            $os = 'Android';
+        } elseif (strpos($ua, 'iPhone') !== false) {
+            $os = 'iPhone';
+        } elseif (strpos($ua, 'iPad') !== false) {
+            $os = 'iPad';
+        } elseif (strpos($ua, 'Mac OS X') !== false || strpos($ua, 'Macintosh') !== false) {
+            $os = 'macOS';
+        } elseif (strpos($ua, 'CrOS') !== false) {
+            $os = 'ChromeOS';
+        } elseif (strpos($ua, 'Linux') !== false) {
+            $os = 'Linux';
+        }
+
+        if ($browser !== '' && $os !== '') {
+            return $this->gettext(['name' => 'passkeyon', 'vars' => ['browser' => $browser, 'os' => $os]]);
+        }
+
+        $label = trim($browser . ' ' . $os);
+        if ($label !== '') {
+            return $label;
+        }
+
+        // Unrecognizable UA: a dated default still distinguishes keys.
+        return $this->gettext('passkeydefaultname') . ' ' . date('Y-m-d');
+    }
+
+    /**
+     * Sanitize a user-supplied passkey description: strip control characters,
+     * trim, and bound the length.
+     */
+    private function clean_desc($value)
+    {
+        $value = preg_replace('/[\x00-\x1F\x7F]+/u', ' ', (string) $value);
+        $value = trim((string) $value);
+
+        return function_exists('mb_substr')
+            ? mb_substr($value, 0, self::MAX_DESC)
+            : substr($value, 0, self::MAX_DESC);
     }
 
     /**
