@@ -401,17 +401,19 @@ var rcube_passkey = (function () {
     // Otherwise remember a real per-browser outcome (the only fully reliable
     // signal), then fall back to a best-effort capability query.
     function applyCachedPrf(ctx) {
+        if (!window.localStorage) {
+            return;
+        }
+        var cached = null;
+        // Guard only the storage read; the branches below can't throw.
         try {
-            if (!window.localStorage) {
-                return;
-            }
-            var cached = window.localStorage.getItem(PRF_KEY);
-            if (cached === '0') {
-                ctx.prfSupported = false;
-            } else if (cached === '1') {
-                ctx.prfSupported = true;
-            }
+            cached = window.localStorage.getItem(PRF_KEY);
         } catch (e) { /* localStorage blocked — leave undetermined */ }
+        if (cached === '0') {
+            ctx.prfSupported = false;
+        } else if (cached === '1') {
+            ctx.prfSupported = true;
+        }
     }
 
     function queryPrfCapability(ctx) {
@@ -435,19 +437,22 @@ var rcube_passkey = (function () {
     // ---- method cookie -------------------------------------------------
 
     function setMethod(value) {
+        var secure = location.protocol === 'https:' ? '; Secure' : '';
+        // 30 days, in seconds. Guard only the cookie write.
         try {
-            var secure = location.protocol === 'https:' ? '; Secure' : '';
-            // 30 days, in seconds.
             document.cookie = METHOD_COOKIE + '=' + value
                 + '; Max-Age=' + (30 * 24 * 60 * 60) + '; Path=/; SameSite=Lax' + secure;
         } catch (e) { /* cookies unavailable — non-fatal */ }
     }
 
     function lastMethod() {
+        var cookie;
+        // Guard only the cookie read; parsing below can't throw.
         try {
-            var m = /(?:^|;\s*)passkey_login_method=([^;]*)/.exec(document.cookie);
-            return m ? decodeURIComponent(m[1]) : null;
+            cookie = document.cookie;
         } catch (e) { /* cookie unreadable — treat as no preference */ return null; }
+        var m = /(?:^|;\s*)passkey_login_method=([^;]*)/.exec(cookie);
+        return m ? decodeURIComponent(m[1]) : null;
     }
 
     // Whether a passkey sign-in can be offered right now: the browser supports
