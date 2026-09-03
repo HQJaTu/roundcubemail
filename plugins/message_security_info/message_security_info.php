@@ -377,7 +377,14 @@ class message_security_info extends rcube_plugin
         }
 
         $result = strtolower($entry['result']);
-        $domain = ($entry['domain'] ?? null) ?: ($method === 'dkim' ? $sig_domain : null);
+        $domain = $entry['domain'] ?? null;
+
+        if (!$domain) {
+            // A result that named no domain of its own falls back to the
+            // DKIM-Signature above, which is the only other domain on offer.
+            $domain = $method === 'dkim' ? $sig_domain : null;
+        }
+
         $aligned = null;
         $description = null;
 
