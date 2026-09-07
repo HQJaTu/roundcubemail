@@ -3,74 +3,17 @@
 namespace Roundcube\Plugins\Tests;
 
 use PHPUnit\Framework\Attributes\DataProvider;
-use PHPUnit\Framework\TestCase;
 
 use function Roundcube\Tests\invokeMethod;
 
-require_once __DIR__ . '/../message_security_info.php';
+require_once __DIR__ . '/MessageSecurityInfoTestCase.php';
 
 /**
  * The plugin's outward surface: which headers it asks IMAP for, what it makes
  * of a whole message, and what the popup ends up showing.
  */
-class MessageSecurityInfoTest extends TestCase
+class MessageSecurityInfoTest extends MessageSecurityInfoTestCase
 {
-    /** Config keys these tests set, restored after each one. */
-    private const CONFIG_KEYS = [
-        'message_security_info_check_spf',
-        'message_security_info_check_dkim',
-        'message_security_info_check_dmarc',
-        'message_security_info_check_tls',
-        'message_security_info_check_submission',
-        'message_security_info_trusted_authserv',
-        'message_security_info_extra_headers',
-    ];
-
-    /** @var array<string, mixed> */
-    private $config_backup = [];
-
-    #[\Override]
-    protected function setUp(): void
-    {
-        $config = \rcube::get_instance()->config;
-
-        foreach (self::CONFIG_KEYS as $key) {
-            $this->config_backup[$key] = $config->get($key);
-        }
-    }
-
-    #[\Override]
-    protected function tearDown(): void
-    {
-        $config = \rcube::get_instance()->config;
-
-        // rcube is a singleton, so anything set here would leak into the next test.
-        foreach ($this->config_backup as $key => $value) {
-            $config->set($key, $value);
-        }
-    }
-
-    /**
-     * A plugin instance with its localization loaded, so the rows below are the
-     * real label texts rather than placeholders.
-     *
-     * @param array<string, mixed> $config
-     */
-    private function plugin($config = [])
-    {
-        $rcube = \rcube::get_instance();
-
-        foreach ($config as $key => $value) {
-            $rcube->config->set($key, $value);
-        }
-
-        $plugin = new \message_security_info($rcube->plugins);
-        $plugin->init();
-        $plugin->add_texts('localization/');
-
-        return $plugin;
-    }
-
     /**
      * Headers in the shape IMAP hands them over: a repeated header is an array
      * in document order, a single one is a plain string.
