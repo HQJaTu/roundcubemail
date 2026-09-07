@@ -72,6 +72,12 @@ class message_security_info extends rcube_plugin
     /** Best-first ranking used to pick between several DKIM signatures. */
     private const DKIM_PREFERENCE = ['pass', 'warn', 'unknown', 'fail'];
 
+    /**
+     * Unfolds a header: a run of whitespace, including the CRLF and leading
+     * space of a continuation line, is one separator (RFC 5322 § 2.2.3).
+     */
+    private const WHITESPACE_RUN = '/\s+/';
+
     #[\Override]
     public function init()
     {
@@ -549,7 +555,7 @@ class message_security_info extends rcube_plugin
             return null;
         }
 
-        $top = preg_replace('/\s+/', ' ', $received[0]);
+        $top = preg_replace(self::WHITESPACE_RUN, ' ', $received[0]);
 
         // RFC 3848: the trailing "A" is the authenticated form, with an optional
         // "S" before it for TLS. tls_info() reads the same clause for the "S".
@@ -680,7 +686,7 @@ class message_security_info extends rcube_plugin
         $out = ['dkim' => [], 'spf' => [], 'dmarc' => []];
 
         foreach ($this->normalize($headers->get('Authentication-Results', false)) as $ar) {
-            $ar = trim(preg_replace('/\s+/', ' ', $ar));
+            $ar = trim(preg_replace(self::WHITESPACE_RUN, ' ', $ar));
             $segments = explode(';', $ar);
             $authserv = strtolower(trim(strtok($segments[0], ' ')));
 
@@ -846,7 +852,7 @@ class message_security_info extends rcube_plugin
             return null;
         }
 
-        $top = preg_replace('/\s+/', ' ', $received[0]);
+        $top = preg_replace(self::WHITESPACE_RUN, ' ', $received[0]);
 
         // Cipher/version detail, when the receiving MTA logged it, e.g.
         // "(using TLSv1.3 ...)" or "(version=TLS1_3 cipher=...)".
