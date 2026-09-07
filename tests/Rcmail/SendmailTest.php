@@ -16,14 +16,14 @@ class SendmailTest extends ActionTestCase
     public function test_headers_input()
     {
         $_POST = [
-            '_subject' => "Test1\nTest2",
+            '_subject' => "Test1\nTest2\rTest3",
             '_from' => 'Sender <test@domain.tld>',
         ];
 
         $sendmail = new \rcmail_sendmail();
         $headers = $sendmail->headers_input();
 
-        $this->assertSame('Test1 Test2', $headers['Subject']);
+        $this->assertSame('Test1 Test2 Test3', $headers['Subject']);
         $this->assertSame('Sender <test@domain.tld>', $headers['From']);
         $this->assertSame('undisclosed-recipients:;', $headers['To']);
         $this->assertSame('test@domain.tld', $headers['X-Sender']);
@@ -159,6 +159,11 @@ class SendmailTest extends ActionTestCase
                 'test@тест.рф.', // #8493
                 'test@xn--e1aybc.xn--p1ai',
                 'UTF-8',
+            ],
+            [
+                '"x\rBcc: attacker@evil.example\rX-Pad: p" <victim@example.com>',
+                '"x Bcc: attacker@evil.example X-Pad: p" <victim@example.com>',
+                null,
             ],
         ];
     }

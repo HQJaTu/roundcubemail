@@ -6,7 +6,24 @@ This file includes only changes we consider noteworthy for users, admins and plu
 
 - Preserve the original message date on import of EML messages (#5559, #10251)
 - OAuth: Validate JWT token signature (#10210)
+- Installer: Add possibility to detsroy the installer session/cookie
+
+## Release 1.7.4
+
 - Use `X-Content-Type-Options:nosniff` for attachment previews and downloads (#10308)
+- zipdownload: Fix attachment filename sanitisation of backslash and control characters (#10325)
+- Security: Fix CSS declaration smuggling via un-encoded ampersand emission
+- Security: Fix CSS property injection via body `background` attribute
+- Security: Fix email header injection via bare CR in the subject field
+- Security: Fix email header injection via C-escape \r in the recipient display name
+- Security: Fix email header injection via identity's organization field
+- Security: Fix zero-click stored XSS via TNEF MIME tag injection in the attachment URL
+- Security: Fix XSS in the HTML editor using text/enriched part content
+- Security: Fix cross-user access in contact group membership (add/remove) in the SQL address book
+- Security: Fix is_local_url() bypass via trailing-dot FQDN in stylesheet URL
+- Security: Fix remote content blocking bypass via CSS escapes in FuncIRI attributes
+- Security: Fix remote-content blocker bypass via SVG SMIL src animation
+- Security: Fix SSRF bypass in Roundcube CSS proxy via hexadecimal IPv6-mapped IPv4 addresses
 
 ## Release 1.7.3
 

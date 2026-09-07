@@ -728,6 +728,7 @@ class UtilsTest extends TestCase
             ['http://fc00--1.nip.io', true],
             ['http://--1.nip.io', true],
             ['http://127-0-0-1.nip.io', true],
+            ['http://127-0-0-1.nip.io.', true],
             ['http://7F000001.nip.io/', true],
             ['http://metadata.google.internal', true],
             ['http://127.0.0.1.sslip.io/', true],
@@ -735,10 +736,14 @@ class UtilsTest extends TestCase
             ['http://0/', true],
             ['http://100.64.0.1', true],
             ['http://[fe80::1]', true],
+            ['http://[::ffff:7f00:1]/', true],
+            ['http://[0:0:0:0:0:ffff:7f00:1]/', true],
+            ['http://[::ffff:a9fe:a9fe]/', true],
             // Non-local hosts
             ['http://[2001:470::76:0:0:0:2]', false],
             ['http://domain.tld', false],
             ['http://20.0.0.1.nip.io', false],
+            ['http://20.0.0.1.nip.io.', false],
             ['http://www-20-0-0-1.nip.io', false],
             ['http://40b01609.nip.io/', false],
         ];
