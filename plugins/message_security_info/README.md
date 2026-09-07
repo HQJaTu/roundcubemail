@@ -68,7 +68,7 @@ Both stop counting, and a row names the evidence they were read in the light of:
 |---|---|---|
 | SPF | · | FAIL — example.com (submitted from your own server, not relayed) |
 | DMARC | · | FAIL — example.com (submitted from your own server, not relayed) |
-| Submission | | Authenticated as joe.user, from 192.168.8.126 |
+| Submission | | Authenticated as joe.user, from 198.51.100.126 |
 
 This is recognised only when the message has a **single** `Received` hop and your
 server recorded that its client **authenticated** (an RFC 3848 `ESMTPA` /

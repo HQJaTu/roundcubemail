@@ -200,7 +200,7 @@ class MessageSecurityInfoVerdictTest extends MessageSecurityInfoTestCase
      */
     public static function provide_submission_info_cases(): iterable
     {
-        $submitted = 'from smtpclient.apple (unknown [192.168.8.126])'
+        $submitted = 'from smtpclient.apple (unknown [198.51.100.126])'
             . " (using TLSv1.3 with cipher TLS_AES_256_GCM_SHA384 (256/256 bits))\n"
             . "\t(Authenticated sender: joe.user)\n"
             . "\tby mta-in.example.com (Postfix) with ESMTPSA id 77A101842B06\n"
@@ -212,32 +212,32 @@ class MessageSecurityInfoVerdictTest extends MessageSecurityInfoTestCase
 
         return [
             'authenticated submission' => [
-                ['user' => 'joe.user', 'client' => '192.168.8.126'], $submitted,
+                ['user' => 'joe.user', 'client' => '198.51.100.126'], $submitted,
             ],
 
             // A single Received is a string, not an array, when it comes off IMAP.
             'single hop as an array' => [
-                ['user' => 'joe.user', 'client' => '192.168.8.126'], [$submitted],
+                ['user' => 'joe.user', 'client' => '198.51.100.126'], [$submitted],
             ],
 
             // Authentication without TLS is still a submission (RFC 3848 ESMTPA).
             'ESMTPA' => [
-                ['user' => 'joe.user', 'client' => '192.168.8.126'],
+                ['user' => 'joe.user', 'client' => '198.51.100.126'],
                 str_replace('with ESMTPSA', 'with ESMTPA', $submitted),
             ],
 
             // Other MTAs log less than Postfix does.
             'no authenticated-sender clause' => [
-                ['user' => null, 'client' => '192.168.8.126'],
+                ['user' => null, 'client' => '198.51.100.126'],
                 str_replace("\t(Authenticated sender: joe.user)\n", '', $submitted),
             ],
             'no client address' => [
                 ['user' => 'joe.user', 'client' => null],
-                str_replace('smtpclient.apple (unknown [192.168.8.126])', 'smtpclient.apple', $submitted),
+                str_replace('smtpclient.apple (unknown [198.51.100.126])', 'smtpclient.apple', $submitted),
             ],
             'IPv6 client' => [
                 ['user' => 'joe.user', 'client' => '2001:db8::1'],
-                str_replace('unknown [192.168.8.126]', 'unknown [IPv6:2001:db8::1]', $submitted),
+                str_replace('unknown [198.51.100.126]', 'unknown [IPv6:2001:db8::1]', $submitted),
             ],
 
             // Not a submission: the client did not authenticate.
@@ -277,7 +277,7 @@ class MessageSecurityInfoVerdictTest extends MessageSecurityInfoTestCase
     public function test_excuse_local_submission()
     {
         $plugin = $this->plugin();
-        $submission = ['user' => 'joe.user', 'client' => '192.168.8.126'];
+        $submission = ['user' => 'joe.user', 'client' => '198.51.100.126'];
 
         $findings = [
             'spf' => ['verdict' => 'fail', 'description' => null],
@@ -323,7 +323,7 @@ class MessageSecurityInfoVerdictTest extends MessageSecurityInfoTestCase
     public function test_local_submission_is_never_promoted()
     {
         $plugin = $this->plugin();
-        $submission = ['user' => 'joe.user', 'client' => '192.168.8.126'];
+        $submission = ['user' => 'joe.user', 'client' => '198.51.100.126'];
 
         $findings = [
             'spf' => ['verdict' => 'fail', 'description' => null],
@@ -345,7 +345,7 @@ class MessageSecurityInfoVerdictTest extends MessageSecurityInfoTestCase
      */
     public function test_submission_check_disabled()
     {
-        $received = 'from smtpclient.apple (unknown [192.168.8.126])'
+        $received = 'from smtpclient.apple (unknown [198.51.100.126])'
             . ' (Authenticated sender: joe.user)'
             . ' by mta-in.example.com (Postfix) with ESMTPSA id AAA';
 
@@ -369,12 +369,12 @@ class MessageSecurityInfoVerdictTest extends MessageSecurityInfoTestCase
         $plugin = $this->plugin();
 
         $this->assertSame(
-            'Authenticated as joe.user, from 192.168.8.126',
-            invokeMethod($plugin, 'format_submission', [['user' => 'joe.user', 'client' => '192.168.8.126']])
+            'Authenticated as joe.user, from 198.51.100.126',
+            invokeMethod($plugin, 'format_submission', [['user' => 'joe.user', 'client' => '198.51.100.126']])
         );
         $this->assertSame(
-            'Authenticated client, from 192.168.8.126',
-            invokeMethod($plugin, 'format_submission', [['user' => null, 'client' => '192.168.8.126']])
+            'Authenticated client, from 198.51.100.126',
+            invokeMethod($plugin, 'format_submission', [['user' => null, 'client' => '198.51.100.126']])
         );
         $this->assertSame(
             'Authenticated as joe.user',

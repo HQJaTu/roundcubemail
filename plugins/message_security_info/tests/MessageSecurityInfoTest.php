@@ -36,7 +36,7 @@ class MessageSecurityInfoTest extends MessageSecurityInfoTestCase
     {
         return $this->headers(array_merge([
             'from' => 'Joe User <joe@example.com>',
-            'received' => "from smtpclient.apple (unknown [192.168.8.126])\n"
+            'received' => "from smtpclient.apple (unknown [198.51.100.126])\n"
                 . "\t(using TLSv1.3 with cipher TLS_AES_256_GCM_SHA384 (256/256 bits))\n"
                 . "\t(No client certificate requested)\n"
                 . "\t(Authenticated sender: joe.user)\n"
@@ -257,7 +257,7 @@ class MessageSecurityInfoTest extends MessageSecurityInfoTestCase
 
         $this->assertSame('Joe User <joe@example.com>', $rows[0]['value']);
         $this->assertSame('FAIL — example.com (submitted from your own server, not relayed)', $rows[1]['value']);
-        $this->assertSame('Authenticated as joe.user, from 192.168.8.126', $rows[4]['value']);
+        $this->assertSame('Authenticated as joe.user, from 198.51.100.126', $rows[4]['value']);
         $this->assertSame('Encrypted — TLSv1.3', $rows[5]['value']);
 
         // Only the mechanism rows carry a glyph; From and Transport have none.
