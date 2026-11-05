@@ -1,0 +1,47 @@
+<?xml version="1.0"?>
+<!--
+  This plugin ships its own PHPUnit configuration rather than being listed in
+  the core's tests/phpunit.xml, so the upstream file stays pristine and keeps
+  merging cleanly (the same reason phpstan.neon exists beside phpstan.neon.dist).
+
+  Run from anywhere in the tree:
+
+      vendor/bin/phpunit -c plugins/passkey_login/tests/phpunit.xml
+
+  It needs the core's bootstrap, so it must be run from a Roundcube checkout
+  with the dev dependencies installed and config/config-test.inc.php in place
+  (see .ci/run_tests.sh).
+-->
+<phpunit
+  bootstrap="../../../tests/bootstrap.php"
+  colors="true"
+  failOnDeprecation="true"
+  failOnNotice="true"
+  failOnWarning="true"
+  displayDetailsOnTestsThatTriggerDeprecations="true"
+  displayDetailsOnPhpunitDeprecations="true"
+  cacheResult="false"
+>
+  <php>
+    <!--
+      The conflicting-plugin test deliberately provokes rcube::raise_error(),
+      which under CLI echoes the message to STDERR. That is the administrator
+      notification working as intended, but in test output it reads like a
+      failure, so it is silenced with the constant the core provides for it.
+      Test outcomes are unaffected: raise_error() is a notification, never an
+      assertion, and under CLI it does not write to the log either.
+    -->
+    <const name="ROUNDCUBE_STDERR_DISABLE" value="1"/>
+  </php>
+
+  <source>
+    <include>
+      <directory>..</directory>
+    </include>
+  </source>
+  <testsuites>
+    <testsuite name="passkey_login">
+      <directory>.</directory>
+    </testsuite>
+  </testsuites>
+</phpunit>

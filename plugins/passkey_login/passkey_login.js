@@ -417,11 +417,15 @@ var rcube_passkey = (function () {
     }
 
     function queryPrfCapability(ctx) {
+        // prfCapable() resolves rather than rejects, but the chain terminates
+        // here anyway: the probe is best-effort, and leaving it unterminated
+        // would turn any future throw in the handler above into a silent
+        // unhandled rejection on the login page.
         rcube_passkey.prfCapable().then(function (v) {
             if (v !== null && ctx.prfSupported === null) {
                 ctx.prfSupported = v;
             }
-        });
+        }).catch(function () { /* capability stays undetermined */ });
     }
 
     function detectPrfSupport(ctx) {
