@@ -56,6 +56,34 @@ class passkey_login extends rcube_plugin
     private const ALLOWED_ALGS = [-7, -257];
 
     /**
+     * User-agent substrings mapped to browser labels, most specific first:
+     * Edge and Opera identify themselves *and* carry "Chrome".
+     */
+    private const BROWSER_TOKENS = [
+        'Edg' => 'Edge',
+        'OPR' => 'Opera',
+        'Opera' => 'Opera',
+        'Firefox' => 'Firefox',
+        'Chrome' => 'Chrome',
+        'Safari' => 'Safari',
+    ];
+
+    /**
+     * User-agent substrings mapped to OS labels, most specific first: Android
+     * user agents also contain "Linux", and iOS ones contain "Mac OS X".
+     */
+    private const OS_TOKENS = [
+        'Windows' => 'Windows',
+        'Android' => 'Android',
+        'iPhone' => 'iPhone',
+        'iPad' => 'iPad',
+        'Mac OS X' => 'macOS',
+        'Macintosh' => 'macOS',
+        'CrOS' => 'ChromeOS',
+        'Linux' => 'Linux',
+    ];
+
+    /**
      * Plugins that also take over the login form / authentication flow and
      * therefore cannot run alongside this one. Extend as needed.
      */
@@ -673,36 +701,8 @@ class passkey_login extends rcube_plugin
     {
         $ua = (string) ($_SERVER['HTTP_USER_AGENT'] ?? '');
 
-        // Order matters: Edge/Opera identify themselves *and* carry "Chrome".
-        $browser = '';
-        if (str_contains($ua, 'Edg')) {
-            $browser = 'Edge';
-        } elseif (str_contains($ua, 'OPR') || str_contains($ua, 'Opera')) {
-            $browser = 'Opera';
-        } elseif (str_contains($ua, 'Firefox')) {
-            $browser = 'Firefox';
-        } elseif (str_contains($ua, 'Chrome')) {
-            $browser = 'Chrome';
-        } elseif (str_contains($ua, 'Safari')) {
-            $browser = 'Safari';
-        }
-
-        $os = '';
-        if (str_contains($ua, 'Windows')) {
-            $os = 'Windows';
-        } elseif (str_contains($ua, 'Android')) { // before Linux (Android UAs contain "Linux")
-            $os = 'Android';
-        } elseif (str_contains($ua, 'iPhone')) {
-            $os = 'iPhone';
-        } elseif (str_contains($ua, 'iPad')) {
-            $os = 'iPad';
-        } elseif (str_contains($ua, 'Mac OS X') || str_contains($ua, 'Macintosh')) {
-            $os = 'macOS';
-        } elseif (str_contains($ua, 'CrOS')) {
-            $os = 'ChromeOS';
-        } elseif (str_contains($ua, 'Linux')) {
-            $os = 'Linux';
-        }
+        $browser = $this->ua_label($ua, self::BROWSER_TOKENS);
+        $os = $this->ua_label($ua, self::OS_TOKENS);
 
         if ($browser !== '' && $os !== '') {
             return $this->gettext(['name' => 'passkeyon', 'vars' => ['browser' => $browser, 'os' => $os]]);
@@ -715,6 +715,26 @@ class passkey_login extends rcube_plugin
 
         // Unrecognizable UA: a dated default still distinguishes keys.
         return $this->gettext('passkeydefaultname') . ' ' . date('Y-m-d');
+    }
+
+    /**
+     * The first label whose token occurs in the user-agent string; '' when
+     * none match. Token order in the map encodes precedence.
+     *
+     * @param string                $ua     User-agent string
+     * @param array<string, string> $tokens Substring => label, most specific first
+     *
+     * @return string
+     */
+    private function ua_label($ua, $tokens)
+    {
+        foreach ($tokens as $needle => $label) {
+            if (str_contains($ua, $needle)) {
+                return $label;
+            }
+        }
+
+        return '';
     }
 
     /**
